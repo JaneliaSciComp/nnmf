@@ -1,4 +1,4 @@
-function A = processMiniData
+function A = processMiniData_edited
 %process recordings of GluSnFR minis from the Schreiter Nikon Scope
 
 %parameters
@@ -40,6 +40,7 @@ for fnum = length(fns):-1:1
     
     f = bfopen([dr filesep fns{fnum}]);
     IM = double(cat(3, f{1}{:,1}))-cameraOffset;
+    IM = imgaussfilt(IM,0.5);
     IMds = IM;
     T2 = size(IMds,3);
     T = size(IMds,3);
