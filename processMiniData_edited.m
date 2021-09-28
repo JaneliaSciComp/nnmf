@@ -8,7 +8,7 @@ sparseFac = 0.15; % set to 0 all pixels with less than sparseFac of the maximum 
 maxN = 1600;
 cameraOffset = 1; %(was 400)hamamatsu cameras have an offset of 100 per pixel, 400 for 2x2 binning
 sigma = 2; %area to consider for sources (gaussian sigma of initial weights, full window width will be ~ 6*sigma+1)
-[b1,a1] = butter(4, 0.02); %lowpass filter for defining F0/bleaching correction 
+[b1,a1] = butter(4, 0.02); %lowpass filter for defining F0/bleaching correction
 [b2,a2] = butter(4, 0.08, 'high'); % 0.08 highpass filter for generating correlation image
 
 hFvs = [];
@@ -32,15 +32,28 @@ if ~iscell(fns)
 end
 
 for fnum = length(fns):-1:1
-%     if exist([dr filesep fns{fnum}(1:end-4) '.mat'], 'file')
-%         disp(['Already processed:' fns{fnum} ', skipping.'])
-%         continue
-%     end
+    %     if exist([dr filesep fns{fnum}(1:end-4) '.mat'], 'file')
+    %         disp(['Already processed:' fns{fnum} ', skipping.'])
+    %         continue
+    %     end
     A = struct();%initialize output, one output struct for each input file
     
     f = bfopen([dr filesep fns{fnum}]);
     IM = double(cat(3, f{1}{:,1}))-cameraOffset;
     IM = imgaussfilt(IM,0.5);
+    %imshow(bwareaopen(a>0,10))
+    
+%     gfp_dir = fileparts(fileparts(dr));
+%     gfp_file = dir([gfp_dir '/' '*.tif']);
+%     gfp=imread([gfp_file.folder '/' gfp_file.name]);
+%     bw = bwareaopen(imbinarize(gfp,'adaptive'),9);
+%     bw = imdilate(bw,strel('diamond',3));
+%     for i=1:size(IM,3)
+%         frame = IM(:,:,i);
+%         background = randi(10,size(bw));
+%         frame(bw==0)=background(bw==0);
+%         IM(:,:,i) = frame;
+%     end
     IMds = IM;
     T2 = size(IMds,3);
     T = size(IMds,3);
@@ -53,22 +66,22 @@ for fnum = length(fns):-1:1
     %downsample in space (we should have binned 4x at acquisition time...)
     %IM = IM(1:2:end,1:2:end,:) + IM(2:2:end,1:2:end,:) + IM(1:2:end,2:2:end,:) + IM(2:2:end,2:2:end,:);
     
-%     sz = [size(IM,1) size(IM,2)];
-%     T = size(IM,3);
-%     
-%     %downsample in time
-%     IMds = IM;
-%     nIter = 0; %number of time downsampling iterations
-%     for it = 1:nIter
-%         IMds = IMds(:,:,1:2*floor(end/2));
-%         IMds=IMds(:,:,1:2:end) + IMds(:,:,2:2:end);
-%     end
-%     IMds = IMds./(2.^it); %keep scale;
-%     
-%     meanIM = mean(IMds,3);
-%     T2 = size(IMds,3);
+    %     sz = [size(IM,1) size(IM,2)];
+    %     T = size(IM,3);
+    %
+    %     %downsample in time
+    %     IMds = IM;
+    %     nIter = 0; %number of time downsampling iterations
+    %     for it = 1:nIter
+    %         IMds = IMds(:,:,1:2*floor(end/2));
+    %         IMds=IMds(:,:,1:2:end) + IMds(:,:,2:2:end);
+    %     end
+    %     IMds = IMds./(2.^it); %keep scale;
+    %
+    %     meanIM = mean(IMds,3);
+    %     T2 = size(IMds,3);
     
-
+    
     %compute F0
     disp('computing F0...');
     v = 0;
@@ -109,13 +122,16 @@ for fnum = length(fns):-1:1
     
     %highpass filter for correlation image
     dFdshp = permute(filtfilt(b2,a2,permute(dFds, [3 1 2])), [2 3 1]);
-
+    
     %compute correlation image on downsampled recording
     disp('computing correlation image');
     ss = sum(dFdshp.^2,3);
     vertC = sum(dFdshp .* circshift(dFdshp, [1 0 0]),3)./sqrt(ss.*circshift(ss, [1 0 0]));
     horzC = sum(dFdshp .* circshift(dFdshp, [0 1 0]),3)./sqrt(ss.*circshift(ss, [0 1 0]));
     C = nanmean(cat(3, horzC, circshift(horzC,1,2), vertC, circshift(vertC, 1,1)),3);
+    
+    C(isnan(C))=0; % TODO: is this ok??
+    
     A.corrIM = C;
     
     %find peaks in correlation image to initialize cNMF
@@ -126,8 +142,8 @@ for fnum = length(fns):-1:1
     BW = imregionalmax(C2);
     C2(imdilate(BW, strel('disk', 6*sigma))) = 0;
     while any(C2(:))
-       BW = BW | imregionalmax(C2);
-       C2(imdilate(BW, strel('disk', 6*sigma))) = 0;
+        BW = BW | imregionalmax(C2);
+        C2(imdilate(BW, strel('disk', 6*sigma))) = 0;
     end
     BWinds = find(BW(:));
     if length(BWinds)>maxN
@@ -154,7 +170,7 @@ for fnum = length(fns):-1:1
     for bigIter = 1:nIter
         disp(['outer loop ' int2str(bigIter) ' of ' int2str(nIter)]);
         nW0 = sum(W0>0,1);
-       
+        
         %apply sparsity
         setZero = W0<(sparseFac.*max(W0,[],1));
         setZero(:, nW0<=9) = false; %don't shrink any more once below 9 pixels
@@ -212,7 +228,7 @@ for fnum = length(fns):-1:1
     
     %Select only sparse components
     nW0 = sum(W0>0,1);
-    smallComps = nW0<(prod(sz)*0.01); 
+    smallComps = nW0<(prod(sz)*0.01);
     W0 = W0(:,smallComps);
     Hhf = Hhf(smallComps,:);
     
@@ -252,7 +268,12 @@ for fnum = length(fns):-1:1
     A.DFF = DFF; A.rawDFF = rawDFF;
     A.F = F; A.rawF = rawF;
     A.spatial = reshape(W0, [sz size(W0,2)]);
+    A.dr = dr;
+    A.filename = fns{fnum};
     
+    create_clustergram(DFF);
+    create_pca_analysis_figures(DFF);
+    create_pca_colored_movie(A);
     save([dr filesep fns{fnum}(1:end-4) 'v2'], 'A', '-v7.3');
     clear F0 dF A
 end
@@ -261,9 +282,11 @@ end
 
 function hF = visualize_comps(S, sz)
 nS = size(S,2);
-RGB = rand(3,nS).^2; RGB = RGB./repmat(sum(RGB,1), 3,1);
+RGB = rand(3,nS).^2;
+RGB = RGB./repmat(sum(RGB,1), 3,1);
 S_RGB = sqrt([S*RGB(1,:)' S*RGB(2,:)' S*RGB(3,:)']);
 S_RGB = 1.5* S_RGB./max(S_RGB(:));
 S_RGB = reshape(full(S_RGB), [sz 3]);
 hF = figure('Name', 'NMF components'); imshow(S_RGB);
 end
+
