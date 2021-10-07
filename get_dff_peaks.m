@@ -1,9 +1,14 @@
 function [pks, locs, widths, proms] = get_dff_peaks(DFF, varargin)
+%GET_DFF_PEAKS Obtains peaks from DFF trace given an optinal
+%minPeakProminence, with default = 0.03.
+
+
 if isempty(varargin)
     minPeakProminence=0.03;
 else
     minPeakProminence = varargin{1};
 end
+
 pks = cell(size(DFF,1),1);
 locs = cell(size(DFF,1),1);
 widths = cell(size(DFF,1),1);
