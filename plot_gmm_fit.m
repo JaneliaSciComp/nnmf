@@ -4,7 +4,7 @@ function GMmodel = plot_gmm_fit(data, nGaussians)
     
     fig = figure();
     ax = axes(fig);
-    hold(ax);
+    hold(ax, 'on');
     set(ax, 'FontSize', 12);
 
     histogram(ax, data,'Normalization','pdf');
