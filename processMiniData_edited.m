@@ -43,17 +43,15 @@ for fnum = length(fns):-1:1
     IM = imgaussfilt(IM,0.5);
     %imshow(bwareaopen(a>0,10))
     
-%     gfp_dir = fileparts(fileparts(dr));
-%     gfp_file = dir([gfp_dir '/' '*.tif']);
-%     gfp=imread([gfp_file.folder '/' gfp_file.name]);
-%     bw = bwareaopen(imbinarize(gfp,'adaptive'),9);
-%     bw = imdilate(bw,strel('diamond',3));
-%     for i=1:size(IM,3)
-%         frame = IM(:,:,i);
-%         background = randi(10,size(bw));
-%         frame(bw==0)=background(bw==0);
-%         IM(:,:,i) = frame;
-%     end
+    gfp_dir = fileparts(fileparts(dr));
+    gfp_file = dir([gfp_dir '/' '*.tif']);
+    gfp_normalized=mat2gray(imread([gfp_file.folder '/' gfp_file.name]));
+
+    %bw = bwareaopen(imbinarize(gfp,'adaptive'),9);
+    %bw = imdilate(bw,strel('diamond',3));
+    %for i=1:size(IM,3)
+    %    IM(:,:,i) = IM(:,:,i).*gfp_normalized;
+    %end
     IMds = IM;
     T2 = size(IMds,3);
     T = size(IMds,3);
