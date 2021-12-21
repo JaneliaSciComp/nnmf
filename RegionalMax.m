@@ -33,6 +33,7 @@ for ii = 1:length(fns)
     
     BW = imregionalmax(IMd,8);
     saveastiff(uint8(BW),[savedr '/test.tif']);
+    
 end
 
 end
