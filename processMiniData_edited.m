@@ -103,7 +103,11 @@ for fnum = length(fns):-1:1
     
     %compute F0 and dF
     dFds = IMds-F0ds;
-    F0 = reshape(interp1((0.5:1:T2).*(2.^it), reshape(F0ds,[],T2)',  1:T, 'linear', 'extrap')', size(IM));
+    if it==0
+        F0 = F0ds;
+    else
+        F0 = reshape(interp1((0.5:1:T2).*(2.^it), reshape(F0ds,[],T2)',  1:T, 'linear', 'extrap')', size(IM));
+    end
     dF = IM - F0;
     
     %ensure that F0 is always>0; We will additionally regularize when
