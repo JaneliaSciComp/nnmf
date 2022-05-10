@@ -27,7 +27,6 @@ probability_density_lognormal = fitdist(data,'Lognormal');
 % plot pdfs
 track_best_model = zeros(1,num_trials);
 for trial=1:num_trials
-    close all
     probability_density_gmm = plot_gmm_fit(data,best_num_gaussians,trial==num_trials);
     pdf_points = (min(data):(max(data)-min(data))/1000:max(data))';
     y_lognormal = pdf(probability_density_lognormal, pdf_points);
