@@ -48,6 +48,10 @@ end
 model_names = {'Lognormal'; 'GMM'};
 fprintf('Best model over %d trials is %s.\n\n', num_trials, model_names{mode(track_best_model)+1});
 
+% Print loglikelihood
+fprintf('Loglikelihood for GMM: %e.\n', loglikelihood_gmm);
+fprintf('Loglikelihood for Lognormal: %e.\n\n', loglikelihood_lognormal);
+
 % Print AICs
 fprintf('AIC for GMM: %e.\n', AIC_gmm);
 fprintf('AIC for Lognormal: %e.\n\n', AIC_lognormal);
