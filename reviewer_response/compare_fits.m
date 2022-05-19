@@ -79,17 +79,17 @@ ax = axes(fig);
 hold(ax, 'on');
 set(ax, 'FontSize', 12);
 plot([min(data),max(data)],[min(data), max(data)],'b','linewidth',3);
-plot(icdf_xs_gmm, sorted_x,'r+')
-plot(icdf_xs_lognormal,sorted_x,'g+')
-xlabel('Empirical Quantiles', 'FontSize', 14);
-ylabel('Model Quantiles', 'FontSize', 14);
+plot(sorted_x, icdf_xs_gmm,'r+')
+plot(sorted_x, icdf_xs_lognormal,'g+')
+ylabel('Empirical Quantiles', 'FontSize', 14);
+xlabel('Model Quantiles', 'FontSize', 14);
 legend('y=x','GMM','Lognormal','location','best')
-gmm_rsquared = mean((icdf_xs_gmm-sorted_x).^2);
-lognormal_rsquared = mean((icdf_xs_lognormal-sorted_x).^2);
+gmm_rms = mean((icdf_xs_gmm-sorted_x).^2);
+lognormal_rms = mean((icdf_xs_lognormal-sorted_x).^2);
 
 % Print Q-Q plot r-squared
-fprintf('r-squared quantile devation of GMM from y=x: %e.\n',gmm_rsquared);
-fprintf('r-squared quantile devation of Lognormal from y=x: %e.\n\n',lognormal_rsquared);
+fprintf('RMS quantile devation of GMM from y=x: %e.\n',gmm_rms);
+fprintf('RMS quantile devation of Lognormal from y=x: %e.\n\n',lognormal_rms);
 %% taken from qqplot.m
 function pp = plotpos(sx)
 %PLOTPOS Compute plotting positions for a probability plot
