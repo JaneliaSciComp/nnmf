@@ -54,7 +54,8 @@ fprintf('Loglikelihood for Lognormal: %e.\n\n', loglikelihood_lognormal);
 
 % Print AICs
 fprintf('AIC for GMM: %e.\n', AIC_gmm);
-fprintf('AIC for Lognormal: %e.\n\n', AIC_lognormal);
+fprintf('AIC for Lognormal: %e.\n', AIC_lognormal);
+fprintf('Relative likelihood: %e.\n\n',exp((AIC_gmm - AIC_lognormal)/2))
 
 % plot cdfs
 fig = figure();
