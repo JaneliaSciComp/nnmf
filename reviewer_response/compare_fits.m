@@ -10,16 +10,20 @@ num_trials = 1000;
 track_best_num_gaussians = zeros(num_trials,1);
 % try over a range of trials
 rng(1)
+all_aic = [];
 for trial = 1:num_trials
     for k = 1:4
         gmm{k} = fitgmdist(data, k, 'options', options);
         AIC(k)= gmm{k}.AIC;
     end
+    all_aic = [all_aic; AIC'];
     [best_aic, best_num_gaussians] = min(AIC);
     % probability_density_gmm = gmm{best_num_gaussians};
     track_best_num_gaussians(trial) = best_num_gaussians;
 end
 best_num_gaussians = mode(track_best_num_gaussians);
+avg_aic = mean(all_aic);
+fprintf('Average GMM AICs over %d trials for:\n1-component: %e\n2-component: %e\n3-component: %e\n4-component: %e\n\n',num_trials, avg_aic(1),avg_aic(2), avg_aic(3), avg_aic(4));
 fprintf('Best number of guassians over %d trials: %d.\n\n', num_trials, best_num_gaussians);
 %% compare best gmm to lognormal
 probability_density_lognormal = fitdist(data,'Lognormal');
@@ -63,9 +67,9 @@ ax = axes(fig);
 hold(ax, 'on');
 set(ax, 'FontSize', 12);
 [f,x] = ecdf(data);
-plot(x,f,'b','linewidth',3)
-plot(pdf_points, probability_density_gmm.cdf(pdf_points), 'g','linewidth',1.5);
-plot(pdf_points, probability_density_lognormal.cdf(pdf_points),'r','linewidth',1.5);
+plot(x,f,'b','linewidth',4)
+plot(pdf_points, probability_density_gmm.cdf(pdf_points), 'g','linewidth',2);
+plot(pdf_points, probability_density_lognormal.cdf(pdf_points),'r','linewidth',2);
 xlabel('\DeltaF/F', 'FontSize', 14);
 ylabel('CDF', 'FontSize', 14);
 legend('Empirical CDF', 'GMM CDF', 'Lognormal CDF','location','best' )
