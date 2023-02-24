@@ -1,4 +1,4 @@
-function A = processMiniData_edited
+function A = processMiniData_edited(varargin)
 %process recordings of GluSnFR minis from the Schreiter Nikon Scope
 
 %parameters
@@ -25,13 +25,19 @@ hFvs = [];
 % keep = cellfun(@isempty, strfind(fns, 'SAT'));
 % fns = fns(keep);
 
-thisDr = fileparts(which('processMiniData'));
-[fns, dr] = uigetfile([thisDr filesep '*.*'], 'multiselect', 'on');
+if nargin==0
+    thisDr = fileparts(which('processMiniData'));
+    [fns, dr] = uigetfile([thisDr filesep '*.*'], 'multiselect', 'on');
+else
+    [dr,name,ext] = fileparts(varargin{1});
+    fns = [name ext];
+end
+
 if ~iscell(fns)
     fns = {fns};
 end
-
 for fnum = length(fns):-1:1
+
     %     if exist([dr filesep fns{fnum}(1:end-4) '.mat'], 'file')
     %         disp(['Already processed:' fns{fnum} ', skipping.'])
     %         continue
@@ -43,9 +49,9 @@ for fnum = length(fns):-1:1
     IM = imgaussfilt(IM,0.5);
     %imshow(bwareaopen(a>0,10))
     
-    gfp_dir = fileparts(fileparts(dr));
-    gfp_file = dir([gfp_dir '/' '*.tif']);
-    gfp_normalized=mat2gray(imread([gfp_file.folder '/' gfp_file.name]));
+    % gfp_dir = fileparts(fileparts(dr));
+    % gfp_file = dir([gfp_dir '/' '*.tif']);
+    % gfp_normalized=mat2gray(imread([gfp_file.folder '/' gfp_file.name]));
 
     %bw = bwareaopen(imbinarize(gfp,'adaptive'),9);
     %bw = imdilate(bw,strel('diamond',3));
@@ -79,9 +85,13 @@ for fnum = length(fns):-1:1
     %     meanIM = mean(IMds,3);
     %     T2 = size(IMds,3);
     
+    logfile = dr + "/log.txt";
+    logfileID = fopen(logfile,'w');
     
     %compute F0
     disp('computing F0...');
+    fprintf(logfileID,'%s\n','computing F0...');
+
     v = 0;
     a = 0.04;
     %compute a leaky cumulative minimum
@@ -100,6 +110,7 @@ for fnum = length(fns):-1:1
     clear e1 v a
     F0ds = reshape(F0ds', size(IMds));
     disp('done');
+    fprintf(logfileID,'%s\n','done');
     
     %compute F0 and dF
     dFds = IMds-F0ds;
@@ -117,6 +128,7 @@ for fnum = length(fns):-1:1
     
     %save out the downsampled tiff stacks
     disp('Saving downsampled movies...')
+    fprintf(logfileID,'%s\n','Saving downsampled movies...');
     if ~exist([dr filesep fns{fnum}(1:end-4) '_dFds.tif'], 'file')
         saveastiff(uint16(dFds), [dr filesep fns{fnum}(1:end-4) '_dFds.tif']);
         %bfsave(uint16(IMds), [dr filesep fns{fnum}(1:end-4) '_ds.tif']);
@@ -127,6 +139,8 @@ for fnum = length(fns):-1:1
     
     %compute correlation image on downsampled recording
     disp('computing correlation image');
+    fprintf(logfileID,'%s\n','computing correlation image');
+
     ss = sum(dFdshp.^2,3);
     vertC = sum(dFdshp .* circshift(dFdshp, [1 0 0]),3)./sqrt(ss.*circshift(ss, [1 0 0]));
     horzC = sum(dFdshp .* circshift(dFdshp, [0 1 0]),3)./sqrt(ss.*circshift(ss, [0 1 0]));
@@ -135,8 +149,11 @@ for fnum = length(fns):-1:1
     C(isnan(C))=0; % TODO: is this ok??
     
     A.corrIM = C;
+    fprintf(logfileID,'%s\n','done');
     
     %find peaks in correlation image to initialize cNMF
+    fprintf(logfileID,'%s\n','finding peaks');
+
     C = imgaussfilt(C,0.5);
     C2 = C;
     Cthresh = 2.*(median(C(:))-prctile(C(:),1));
@@ -156,6 +173,7 @@ for fnum = length(fns):-1:1
     
     nComp = length(BWinds);
     [Pr,Pc] = ind2sub(sz, BWinds); %locations of putative release sites
+    fprintf(logfileID,'%s\n','done');
     
     %global cNMF to get footprints and traces for each mini location, with
     %mild unmixing of overlapping signals
@@ -166,6 +184,8 @@ for fnum = length(fns):-1:1
     W0 = reshape(W0, prod(sz),nComp+nBG);
     W0(:, nComp+1:end) = rand(size(W0,1), size(W0,2)-length(Pr))./size(W0,1); %background components are initialized random
     
+    fprintf(logfileID,'%s\n',string(nComp)+' nmf');
+
     %Use multiplicative updates NMF, which makes it easy to zero out pixels
     opts1 = statset('MaxIter', 20,  'Display', 'iter');%, 'UseParallel', true);
     [W0,H0] = nnmf(reshape(dFds,[],T2), nComp+nBG,'algorithm', 'mult', 'w0', W0, 'options', opts1); %!!nnmf has been modified to allow it to take more than rank(Y) inputs
@@ -192,6 +212,7 @@ for fnum = length(fns):-1:1
         W0 = reshape(W0, prod(sz),[]);
         [W0,H0] = nnmf(reshape(dFds,[],T2), nComp+nBG,'algorithm', 'mult', 'w0', W0, 'h0', H0, 'options', opts1);
     end
+    fprintf(logfileID,'%s\n','done');
     
     %get the traces for the full-time-resolution dataset, without nonnegativity constraints
     %constraint
@@ -200,6 +221,7 @@ for fnum = length(fns):-1:1
     Hhf = W0\dF;
     
     %merge small components if they have high correlation
+    fprintf(logfileID,'%s\n','merge components');
     nW0 = sum(W0>0,1);
     smallComps = nW0<(prod(sz)*0.01);
     recalc = false;
@@ -223,7 +245,8 @@ for fnum = length(fns):-1:1
         [W0,~] = nnmf(reshape(dFds,[],T2), sum(sel),'algorithm', 'mult', 'w0', W0, 'h0', H0, 'options', opts1);
         Hhf = W0\dF; %solve for full speed data
     end
-    
+    fprintf(logfileID,'%s\n','done');
+
     %reconstruct the movie and look at residuals; could be used to refine
     %component definition
     %recon = W0*Hhf;
@@ -240,6 +263,7 @@ for fnum = length(fns):-1:1
     set(hFvs, 'name', fns{fnum});
     drawnow;
     
+    fprintf(logfileID,'%s\n','sort components');
     %sort components by high frequency power
     ac = sum(W0,1)'.*Hhf;
     [~,sortorder] = sort(sum((ac-smoothdata(ac,2,'movmean',75)).^2,2), 'descend');
@@ -261,7 +285,8 @@ for fnum = length(fns):-1:1
         rawF(comp,:) = sum(dF(support(selpix),:),1);
         rawDFF(comp,:) = sum(dF(support(selpix),:),1)./Fzero(comp,:);
     end
-    
+    fprintf(logfileID,'%s\n','done');
+
     
     A.fn = [dr filesep fns{fnum}];
     A.lambda = lambda;
@@ -275,7 +300,7 @@ for fnum = length(fns):-1:1
     
     create_clustergram(DFF);
     create_pca_analysis_figures(DFF);
-    create_pca_colored_movie(A);
+    create_dimensionality_reduction_colored_movie(A);
     save([dr filesep fns{fnum}(1:end-4) 'v2'], 'A', '-v7.3');
     clear F0 dF A
 end
