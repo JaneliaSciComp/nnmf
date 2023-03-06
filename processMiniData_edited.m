@@ -1,4 +1,6 @@
 function A = processMiniData_edited(varargin)
+addpath(pwd);
+
 %process recordings of GluSnFR minis from the Schreiter Nikon Scope
 
 %parameters
@@ -31,6 +33,7 @@ if nargin==0
 else
     [dr,name,ext] = fileparts(varargin{1});
     fns = [name ext];
+    sigma = varargin{2};
 end
 
 if ~iscell(fns)
@@ -43,7 +46,7 @@ for fnum = length(fns):-1:1
     %         continue
     %     end
     A = struct();%initialize output, one output struct for each input file
-    
+    % This will fail if running on cluster, so try to read in tiff
     f = bfopen([dr filesep fns{fnum}]);
     IM = double(cat(3, f{1}{:,1}))-cameraOffset;
     IM = imgaussfilt(IM,0.5);
@@ -65,7 +68,6 @@ for fnum = length(fns):-1:1
     sz = [size(IMds,1) size(IMds,2)];
     meanIM = mean(IMds,3);
     clear f
-    
     
     %downsample in space (we should have binned 4x at acquisition time...)
     %IM = IM(1:2:end,1:2:end,:) + IM(2:2:end,1:2:end,:) + IM(1:2:end,2:2:end,:) + IM(2:2:end,2:2:end,:);
