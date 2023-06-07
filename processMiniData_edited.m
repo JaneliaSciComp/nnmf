@@ -8,7 +8,7 @@ nIter = 5; %number of outer loops to run
 bgFrac = 0.2; %fraction of extra components to use to fit non-constrained background in nmf
 sparseFac = 0.15; % set to 0 all pixels with less than sparseFac of the maximum weight
 maxN = 1600;
-cameraOffset = 1; %(was 400)hamamatsu cameras have an offset of 100 per pixel, 400 for 2x2 binning
+cameraOffset = 0; %(was 400)hamamatsu cameras have an offset of 100 per pixel, 400 for 2x2 binning
 sigma = 2; %area to consider for sources (gaussian sigma of initial weights, full window width will be ~ 6*sigma+1)
 [b1,a1] = butter(4, 0.02); %lowpass filter for defining F0/bleaching correction
 [b2,a2] = butter(4, 0.08, 'high'); % 0.08 highpass filter for generating correlation image
@@ -40,13 +40,16 @@ if ~iscell(fns)
     fns = {fns};
 end
 for fnum = length(fns):-1:1
-
+    
+    logfile = dr + "/log.txt";
+    logfileID = fopen(logfile,'w');
     %     if exist([dr filesep fns{fnum}(1:end-4) '.mat'], 'file')
     %         disp(['Already processed:' fns{fnum} ', skipping.'])
     %         continue
     %     end
     A = struct();%initialize output, one output struct for each input file
     % This will fail if running on cluster, so try to read in tiff
+    logger(logfileID,"Reading input file")
     f = bfopen([dr filesep fns{fnum}]);
     IM = double(cat(3, f{1}{:,1}))-cameraOffset;
     IM = imgaussfilt(IM,0.5);
@@ -61,12 +64,20 @@ for fnum = length(fns):-1:1
     %for i=1:size(IM,3)
     %    IM(:,:,i) = IM(:,:,i).*gfp_normalized;
     %end
-    IMds = IM;
-    T2 = size(IMds,3);
-    T = size(IMds,3);
+
+%     gfp=imread(maskchannel);
+%     bw = bwareaopen(imbinarize(gfp,'adaptive'),9);
+%     bw = imdilate(bw,strel('diamond',3));
+%     for i=1:size(IM,3)
+%         IM(:,:,i) = IM(:,:,i).*bw;%gfp_normalized;
+%     end
+    
+    % IMds = IM;
+    T2 = size(IM,3);
+    T = size(IM,3);
     it=0;
-    sz = [size(IMds,1) size(IMds,2)];
-    meanIM = mean(IMds,3);
+    sz = [size(IM,1) size(IM,2)];
+    meanIM = mean(IM,3);
     clear f
     
     %downsample in space (we should have binned 4x at acquisition time...)
@@ -86,75 +97,77 @@ for fnum = length(fns):-1:1
     %
     %     meanIM = mean(IMds,3);
     %     T2 = size(IMds,3);
-    
-    logfile = dr + "/log.txt";
-    logfileID = fopen(logfile,'w');
+
     
     %compute F0
-    disp('computing F0...');
-    fprintf(logfileID,'%s\n','computing F0...');
+    logger(logfile,"computing F0...");
 
     v = 0;
     a = 0.04;
     %compute a leaky cumulative minimum
-    e1 =  medfilt2(reshape(IMds, [], size(IMds,3)), [1 3], 'symmetric');
+    e1 =  medfilt2(reshape(IM, [], size(IM,3)), [1 3], 'symmetric');
+    logger(logfileID,'medfilt');
     for t = 2:size(e1,2)
         e1(:,t) = min(e1(:,t), e1(:,t-1) + v + a);
         v = max(0, e1(:,t) - e1(:,t-1));
     end
+    clear v a
+    logger(logfileID,'done');
     %use it to make a smooth F0 that obeys the data minima
-    F0ds = filtfilt(b1,a1,e1');
+    F0 = filtfilt(b1,a1,e1');
+    logger(logfileID,"filtfilt");
     for ii = 1:6
-        delta = min(0,e1'-F0ds);
+        delta = min(0,e1'-F0);
         delta([1:20, end-19:end],:) = 0;
-        F0ds = filtfilt(b1,a1,F0ds+2*delta); %2*delta to accelerate convergence
+        F0 = filtfilt(b1,a1,F0+2*delta); %2*delta to accelerate convergence
     end
+    logger(logfileID,"done");
+
     clear e1 v a
-    F0ds = reshape(F0ds', size(IMds));
-    disp('done');
-    fprintf(logfileID,'%s\n','done');
+    F0 = reshape(F0', size(IM));
+    logger(logfileID,"reshaped");
     
     %compute F0 and dF
-    dFds = IMds-F0ds;
-    if it==0
-        F0 = F0ds;
-    else
-        F0 = reshape(interp1((0.5:1:T2).*(2.^it), reshape(F0ds,[],T2)',  1:T, 'linear', 'extrap')', size(IM));
-    end
+    % dF = IM-F0;
+    % if it==0
+    %    F0 = F0ds;
+    % else
+    %    F0 = reshape(interp1((0.5:1:T2).*(2.^it), reshape(F0ds,[],T2)',  1:T, 'linear', 'extrap')', size(IM));
+    % end
     dF = IM - F0;
     
     %ensure that F0 is always>0; We will additionally regularize when
     %calculating DFF
     F0 = F0 - min(0, min(F0,[],3));
-    clear F0ds IM
+    clear IM
     
     %save out the downsampled tiff stacks
-    disp('Saving downsampled movies...')
-    fprintf(logfileID,'%s\n','Saving downsampled movies...');
-    if ~exist([dr filesep fns{fnum}(1:end-4) '_dFds.tif'], 'file')
-        saveastiff(uint16(dFds), [dr filesep fns{fnum}(1:end-4) '_dFds.tif']);
+    logger(logfileID,"Saving downsampled movies...");
+    if ~exist([dr filesep fns{fnum}(1:end-4) '_DF.tif'], 'file')
+        saveastiff(dF, [dr filesep fns{fnum}(1:end-4) '_DF.tif']);
+        saveastiff(F0, [dr filesep fns{fnum}(1:end-4) '_F0.tif']);
+        saveastiff(dF./F0, [dr filesep fns{fnum}(1:end-4) '_DFF.tif']);
         %bfsave(uint16(IMds), [dr filesep fns{fnum}(1:end-4) '_ds.tif']);
     end
-    
+
     %highpass filter for correlation image
-    dFdshp = permute(filtfilt(b2,a2,permute(dFds, [3 1 2])), [2 3 1]);
+    dFhp = permute(filtfilt(b2,a2,permute(dF, [3 1 2])), [2 3 1]);
     
     %compute correlation image on downsampled recording
-    disp('computing correlation image');
-    fprintf(logfileID,'%s\n','computing correlation image');
+    logger(logfileID, "computing correlation image");
 
-    ss = sum(dFdshp.^2,3);
-    vertC = sum(dFdshp .* circshift(dFdshp, [1 0 0]),3)./sqrt(ss.*circshift(ss, [1 0 0]));
-    horzC = sum(dFdshp .* circshift(dFdshp, [0 1 0]),3)./sqrt(ss.*circshift(ss, [0 1 0]));
+    ss = sum(dFhp.^2,3);
+    vertC = sum(dFhp .* circshift(dFhp, [1 0 0]),3)./sqrt(ss.*circshift(ss, [1 0 0]));
+    horzC = sum(dFhp .* circshift(dFhp, [0 1 0]),3)./sqrt(ss.*circshift(ss, [0 1 0]));
     C = nanmean(cat(3, horzC, circshift(horzC,1,2), vertC, circshift(vertC, 1,1)),3);
     
     C(isnan(C))=0; % TODO: is this ok??
     
     A.corrIM = C;
-    fprintf(logfileID,'%s\n','done');
+    logger(logfileID,"done");
     
     %find peaks in correlation image to initialize cNMF
-    fprintf(logfileID,'%s\n','finding peaks');
+    logger(logfileID,"finding peaks");
 
     C = imgaussfilt(C,0.5);
     C2 = C;
@@ -175,7 +188,7 @@ for fnum = length(fns):-1:1
     
     nComp = length(BWinds);
     [Pr,Pc] = ind2sub(sz, BWinds); %locations of putative release sites
-    fprintf(logfileID,'%s\n','done');
+    logger(logfileID,"done");
     
     %global cNMF to get footprints and traces for each mini location, with
     %mild unmixing of overlapping signals
@@ -186,13 +199,13 @@ for fnum = length(fns):-1:1
     W0 = reshape(W0, prod(sz),nComp+nBG);
     W0(:, nComp+1:end) = rand(size(W0,1), size(W0,2)-length(Pr))./size(W0,1); %background components are initialized random
     
-    fprintf(logfileID,'%s\n',string(nComp)+' nmf');
+    logger(logfileID,string(nComp)+" nmf");
 
     %Use multiplicative updates NMF, which makes it easy to zero out pixels
     opts1 = statset('MaxIter', 20,  'Display', 'iter');%, 'UseParallel', true);
-    [W0,H0] = nnmf(reshape(dFds,[],T2), nComp+nBG,'algorithm', 'mult', 'w0', W0, 'options', opts1); %!!nnmf has been modified to allow it to take more than rank(Y) inputs
+    [W0,H0] = nnmf(reshape(dF,[],T2), nComp+nBG,'algorithm', 'mult', 'w0', W0, 'options', opts1); %!!nnmf has been modified to allow it to take more than rank(Y) inputs
     for bigIter = 1:nIter
-        disp(['outer loop ' int2str(bigIter) ' of ' int2str(nIter)]);
+        logger(logfileID,"outer loop " + int2str(bigIter) + " of " + int2str(nIter));
         nW0 = sum(W0>0,1);
         
         %apply sparsity
@@ -212,9 +225,9 @@ for fnum = length(fns):-1:1
             W0(:,:,comp) = W0(:,:,comp).*bwselect(W0(:,:,comp)>0, cc,rr, 4);
         end
         W0 = reshape(W0, prod(sz),[]);
-        [W0,H0] = nnmf(reshape(dFds,[],T2), nComp+nBG,'algorithm', 'mult', 'w0', W0, 'h0', H0, 'options', opts1);
+        [W0,H0] = nnmf(reshape(dF,[],T2), nComp+nBG,'algorithm', 'mult', 'w0', W0, 'h0', H0, 'options', opts1);
     end
-    fprintf(logfileID,'%s\n','done');
+    logger(logfileID,"done");
     
     %get the traces for the full-time-resolution dataset, without nonnegativity constraints
     %constraint
@@ -223,7 +236,7 @@ for fnum = length(fns):-1:1
     Hhf = W0\dF;
     
     %merge small components if they have high correlation
-    fprintf(logfileID,'%s\n','merge components');
+    logger(logfileID,"merge components");
     nW0 = sum(W0>0,1);
     smallComps = nW0<(prod(sz)*0.01);
     recalc = false;
@@ -239,15 +252,15 @@ for fnum = length(fns):-1:1
         end
     end
     if recalc
-        disp('Some components were merged. Recalculating factorization.');
+        logger(logfileID, "Some components were merged. Recalculating factorization.");
         sel = any(W0,1);
         W0 = W0(:, sel);
         H0 = H0(sel,:);
         %run some more NMF
-        [W0,~] = nnmf(reshape(dFds,[],T2), sum(sel),'algorithm', 'mult', 'w0', W0, 'h0', H0, 'options', opts1);
+        [W0,~] = nnmf(reshape(dF,[],T2), sum(sel),'algorithm', 'mult', 'w0', W0, 'h0', H0, 'options', opts1);
         Hhf = W0\dF; %solve for full speed data
     end
-    fprintf(logfileID,'%s\n','done');
+    logger(logfileID,"done");
 
     %reconstruct the movie and look at residuals; could be used to refine
     %component definition
@@ -287,7 +300,7 @@ for fnum = length(fns):-1:1
         rawF(comp,:) = sum(dF(support(selpix),:),1);
         rawDFF(comp,:) = sum(dF(support(selpix),:),1)./Fzero(comp,:);
     end
-    fprintf(logfileID,'%s\n','done');
+    logger(logfileID,"done");
 
     
     A.fn = [dr filesep fns{fnum}];
@@ -306,6 +319,16 @@ for fnum = length(fns):-1:1
     save([dr filesep fns{fnum}(1:end-4) 'v2'], 'A', '-v7.3');
     clear F0 dF A
 end
+end
+
+function logger(logfileID, msg)
+    [tmp pid] = system('pgrep MATLAB');
+    [tmp mem_usage] = system(['cat /proc/' strtrim(pid) '/status | grep VmSize']);
+    mem_usage = sprintf("%i MB\n", round(str2num(strtrim(extractAfter(extractBefore(mem_usage, ' kB'), ':'))) / 1000));
+    msg = string(datetime("now")) + " " + msg + ": " +  mem_usage;
+    display(msg)
+    fprintf(logfileID,'%s',msg);
+
 end
 
 
