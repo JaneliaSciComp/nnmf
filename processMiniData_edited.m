@@ -312,6 +312,11 @@ for fnum = length(fns):-1:1
     A.spatial = reshape(W0, [sz size(W0,2)]);
     A.dr = dr;
     A.filename = fns{fnum};
+    if nargin==2
+        % Then O'Shea lab data
+        f = bfopen([dr filesep char(strrep(fns{1},"gcamp","mcherry"))]);
+        A.mCherry = cat(3, f{1}{:,1});
+    end
     
     create_clustergram(DFF);
     create_pca_analysis_figures(DFF);

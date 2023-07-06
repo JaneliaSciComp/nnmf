@@ -28,15 +28,15 @@ end
     
     for fnum = length(fns):-1:1
         disp(['Processing: ' int2str(fnum)])
-        pat = "C" + digitsPattern;
-        Cmatch = extract(fns{fnum}, pat);
-        B.consNum(fnum) = str2double(Cmatch{1}(2:end));
-        pat = "W" + digitsPattern(1);
-        Wmatch = extract(fns{fnum}, pat);
-        B.wellNum(fnum) = str2double(Wmatch{1}(2));
-        pat = "F" + digitsPattern;
-        Fmatch = extract(fns{fnum}, pat);
-        B.fovNum(fnum) = str2double(Fmatch{1}(2));
+%         pat = "C" + digitsPattern;
+%         Cmatch = extract(fns{fnum}, pat);
+%         B.consNum(fnum) = str2double(Cmatch{1}(2:end));
+%         pat = "W" + digitsPattern(1);
+%         Wmatch = extract(fns{fnum}, pat);
+%         B.wellNum(fnum) = str2double(Wmatch{1}(2));
+%         pat = "F" + digitsPattern;
+%         Fmatch = extract(fns{fnum}, pat);
+%         B.fovNum(fnum) = str2double(Fmatch{1}(2));
         
         load([dr filesep fns{fnum}], 'A');
         [S,C, tau, snr, freq, inds, traces] = runFOOPSI(A.DFF');

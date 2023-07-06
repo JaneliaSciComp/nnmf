@@ -1,8 +1,17 @@
-function create_pca_analysis_figures(DFF)
+function create_pca_analysis_figures(DFF, varargin)
 %CREATE_PCA_ANALYSIS_FIGURES Creates a couple of figures containing
 %analysis via PCA of the DFF of components
+threshold = true;
+if nargin>1
+    threshold = varargin{1};
+end
 
-rescaled = mat2gray(DFF,[0 .25]);
+if threshold
+    rescaled = mat2gray(DFF,[0 .25]);
+else
+    rescaled = mat2gray(DFF);
+end
+
 [coeff,~,~,~,explained]=pca(rescaled');
 
 figure();
