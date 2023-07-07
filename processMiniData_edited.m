@@ -318,10 +318,10 @@ for fnum = length(fns):-1:1
         A.mCherry = cat(3, f{1}{:,1});
     end
     
+    save([dr filesep fns{fnum}(1:end-4) 'v2'], 'A', '-v7.3');
     create_clustergram(DFF);
     create_pca_analysis_figures(DFF);
     create_dimensionality_reduction_colored_movie(A);
-    save([dr filesep fns{fnum}(1:end-4) 'v2'], 'A', '-v7.3');
     clear F0 dF A
 end
 end
