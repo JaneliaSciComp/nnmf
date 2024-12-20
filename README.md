@@ -11,7 +11,7 @@ In this repository, the goal is to use non-negative matrix factorization to find
 3. &Delta;F is calculated for each image in the series by subtracting F0 from the image; F0 is then ensured to be positive.
 3. A high pass filter is applied to the &Delta;F time series. The resultant images are smoothed and used to create a correlation image.
 4. Peaks in the correlation image are used as input to the NMF to help initialize cluster finding.
-5. NMF is then applied to the &Delta;F time series, with additional contiguous contraints on clusters such that each correlated cluster of pixels below a certain size must be contiguous.
+5. NMF is then applied to the &Delta;F time series, with additional contiguous contraints on clusters such that each correlated cluster of pixels must be contiguous.
 6. Small correlated clusters are then merged.
 7. Cluster metrics are calculated using the most sensitive pixels per cluster.
 8. All relevant information is returned as a struct.
